@@ -1,0 +1,46 @@
+---
+
+---
+
+```{r}
+#| label: code 
+#| warning: false
+#| eval: false
+
+library(here) # Managing nested directories 
+library(haven) # Importing SAS XPT files
+library(readxl) # Importing Excel files
+library(tidyverse) # Data wrangling, viz
+library(reshape2) # For restructuring data
+library(gt) # For table generation
+
+# Define a function to read, process, and save each SAS file individually to a compressed R RDS file
+process_and_save_xpt_files <- function(start_year, end_year, subdirectory, file_extension, temp_directory) {
+  for (year in start_year:end_year) {
+    # Construct the file path
+    file_path <- here(subdirectory, paste0(year, "_data", file_extension))
+    
+    # Read the XPT file
+    data <- read_xpt(file_path)
+    
+    # Ensure consistent data types
+    data <- mutate(data, SEQNO = as.character(SEQNO))
+    
+    # Save the processed data to a temporary file
+    saveRDS(data, file = here(temp_directory, paste0(year, "_data.rds")))
+  }
+}
+
+# Create a temporary directory to save intermediate files
+temp_directory <- "temp_data"
+dir.create(temp_directory, showWarnings = FALSE)
+
+# Process and save each XPT file individually
+process_and_save_xpt_files(
+  start_year = 2014,
+  end_year = 2022,
+  subdirectory = "Data",
+  file_extension = ".XPT",
+  temp_directory = temp_directory
+)
+```

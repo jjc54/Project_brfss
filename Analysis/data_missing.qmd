@@ -1,0 +1,213 @@
+---
+
+---
+
+```{r}
+library(here) # Managing nested directories 
+library(haven) # Importing SAS XPT files
+library(readxl) # Importing Excel files
+library(tidyverse) # Data wrangling, viz
+library(reshape2) # For restructuring data
+library(gt) # For table generation
+
+# Define a function to check the presence of variables and combine the results
+check_and_combine_variable_presence <- function(start_year, end_year, temp_directory, variables_of_interest) {
+  # Initialize an empty list to store results
+  presence_list <- list()
+  
+  for (year in start_year:end_year) {
+    # Construct the file path for the RDS file
+    file_path <- here(temp_directory, paste0(year, "_data.rds"))
+    
+    # Read the RDS file
+    data <- readRDS(file_path)
+    
+    # Check for the presence of each variable of interest
+    presence <- sapply(variables_of_interest, function(var) var %in% names(data))
+    
+    # Create a data frame with the results for the current year
+    presence_df <- data.frame(Year = year, t(presence))
+    
+    # Add the data frame to the list
+    presence_list[[length(presence_list) + 1]] <- presence_df
+    
+    # Remove the original data to free up memory
+    rm(data)
+    gc()  # Call garbage collection to free up memory
+  }
+  
+  # Combine the list of data frames into a single data frame
+  combined_presence <- bind_rows(presence_list)
+  
+  return(combined_presence)
+}
+
+# Variables of interest
+variables_of_interest1 <- c(
+  "_STATE",
+  "IYEAR",
+  "QSTVER",
+  "QSTLANG",
+  "_STSTR",
+  "_STRWT",
+  "_RAWRAKE",
+  "_WT2RAKE",
+  "_SEX",
+  "SOMALE", 
+  "SOFEMALE", 
+  "TRNSGNDR",
+  "_METSTAT",
+  "_URBSTAT",
+  "_RACE1",
+  "HPVADVC4",
+  "HPVADSHT",
+  "CRVCLHPV",
+  "CERVSCRN",
+  "CRVCLCNC",
+  "CRVCLPAP",
+  "CNCRDIFF",
+  "CNCRAGE",
+  "CNCRTYP2"
+)
+
+variables_of_interest2 <- c(
+  "_STATE",
+  "IYEAR",
+  "QSTVER",
+  "QSTLANG",
+  "_STSTR",
+  "_STRWT",
+  "_RAWRAKE",
+  "_WT2RAKE",
+  "_SEX",
+  "SEX",
+  "SEX1",
+  "SOMALE", 
+  "SOFEMALE", 
+  "TRNSGNDR",
+  "_METSTAT",
+  "_URBSTAT",
+  "_RACE1",
+  "HPVADVC4",
+  "HPVADSHT",
+  "CRVCLHPV",
+  "CERVSCRN",
+  "CRVCLCNC",
+  "CRVCLPAP",
+  "HADPAP2",
+  "LASTPAP2",
+  "HPVTEST",
+  "HPLSTTST",
+  "CNCRDIFF",
+  "CNCRAGE",
+  "CNCRTYP2",
+  "CNCRTYP1"
+)
+
+variables_of_interest3 <- c(
+  "_STATE",
+  "IYEAR",
+  "QSTVER",
+  "QSTLANG",
+  "_STSTR",
+  "_STRWT",
+  "_RAWRAKE",
+  "_WT2RAKE",
+  "_SEX",
+  "SEX",
+  "SEX1",
+  "SOMALE", 
+  "SOFEMALE",
+  "SXORIENT",
+  "TRNSGNDR",
+  "_METSTAT",
+  "MSCODE",
+  "_URBSTAT",
+  "_RACE1",
+  "_RACE",
+  "HPVADVC4",
+  "HPVADVC3",
+  "HPVADVC2",
+  "HPVADSHT",
+  "CRVCLHPV",
+  "HPVTEST",
+  "HPLSTTST",
+  "CERVSCRN",
+  "CRVCLCNC",
+  "CRVCLPAP",
+  "HADPAP2",
+  "LASTPAP2",
+  "CNCRDIFF",
+  "CNCRAGE",
+  "CNCRTYP2",
+  "CNCRTYP1"
+)
+
+# Use the function to check variable presence and combine results from 2014 to 2022 (initial)
+combined_presence1 <- check_and_combine_variable_presence(
+  start_year = 2014,
+  end_year = 2022,
+  temp_directory = "temp_data",
+  variables_of_interest = variables_of_interest1
+)
+
+# Use the function to check variable presence and combine results from 2014 to 2022 (2017 identified variables)
+combined_presence2 <- check_and_combine_variable_presence(
+  start_year = 2014,
+  end_year = 2022,
+  temp_directory = "temp_data",
+  variables_of_interest = variables_of_interest2
+)
+
+# Use the function to check variable presence and combine results from 2014 to 2022 (2015 identified variablbes)
+combined_presence3 <- check_and_combine_variable_presence(
+  start_year = 2014,
+  end_year = 2022,
+  temp_directory = "temp_data",
+  variables_of_interest = variables_of_interest3
+)
+
+
+# Optionally, clean up temporary files
+#unlink(temp_directory, recursive = TRUE)
+
+# Reshape data (long) to create heatmaps of missing / present variables
+column_presence_df_long1 <- melt(combined_presence1, id.vars = "Year")
+column_presence_df_long2 <- melt(combined_presence2, id.vars = "Year")
+column_presence_df_long3 <- melt(combined_presence3, id.vars = "Year")
+```
+
+```{r}
+#| label: fig-missing-1
+
+# Generate heatmaps given each selection of variables to see where variables were swapped over the years
+ggplot(column_presence_df_long1, aes(x = variable, y = factor(Year), fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "red")) +
+  theme_minimal() +
+  labs(title = "Presence of Variables Over Years (Initial)", x = "Variable", y = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#| label: fig-missing-2
+
+ggplot(column_presence_df_long2, aes(x = variable, y = factor(Year), fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "red")) +
+  theme_minimal() +
+  labs(title = "Presence of Variables Over Years (2017 adjustment)", x = "Variable", y = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+#| label: fig-missing-3
+
+ggplot(column_presence_df_long3, aes(x = variable, y = factor(Year), fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "red")) +
+  theme_minimal() +
+  labs(title = "Presence of Variables Over Years (2014 adjustment)", x = "Variable", y = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```

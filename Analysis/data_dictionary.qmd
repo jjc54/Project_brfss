@@ -1,0 +1,28 @@
+---
+
+---
+
+```{r}
+library(here) # Managing nested directories 
+library(haven) # Importing SAS XPT files
+library(readxl) # Importing Excel files
+library(tidyverse) # Data wrangling, viz
+library(reshape2) # For restructuring data
+library(gt) # For table generation
+library(kableExtra)
+
+# Construct the path to the codebook using here
+codebook_path <- here("Data", "codebook.xlsx")
+
+# Read the Excel file
+codes <- read_xlsx(codebook_path, sheet = "Current_Codebook")
+```
+
+```{r}
+#| label: tbl-dictionary
+
+codes <- codes %>%
+  kable()
+
+codes
+```

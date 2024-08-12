@@ -1,0 +1,395 @@
+---
+title: "Project_brfss"
+---
+
+## Reading in the 2022 Data
+
+```{r}
+
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(DataExplorer)
+library(here)
+library(reshape2)
+library(haven)
+
+columns <- read_excel(here("Data", "0_annual_lengths.xlsx"), sheet="2022")
+
+columns$File_Width <- sapply(1:nrow(columns), function(y) ifelse(y < nrow(columns), 
+	columns$starting_column[y + 1] - columns$starting_column[y], 1))
+
+columns <- columns[columns$File_Width > 0,]
+
+responses <- read.fwf(here("Data", "2022_data.ASC"), widths = columns$File_Width, col.names = columns$variable_name)
+```
+
+## EDA
+
+```{r}
+
+# Now drop columns where EVERY entry is NA (no data)
+responses_clean <- responses %>%
+  select(where(~ !all(is.na(.))))
+```
+
+## AACR Abstract
+
+Temporal analysis of HPV screening/vaccination and cervical cancer diagnosis by sexual orientation and gender identity.
+
+-   2014-2022
+
+-   Straight v. non-straight
+
+    -   urban v. rural
+
+    -   racial/ethnic
+
+-   Cis v. trans
+
+    -   urban v. rural
+
+    -   racial/ethnic
+
+```{r}
+
+responses_clean <- responses_clean %>%
+    mutate(ID = row_number())
+
+responses_clean_analysis <- responses_clean %>%
+  select(c(ID, X_STATE, COLGSEX1, LANDSEX1, SEXVAR, GENHLTH, PHYSHLTH, MENTHLTH, POORHLTH, PRIMINSR, MEDCOST1, CHECKUP1, EXERANY2, SLEPTIM1, CVDINFR4, CVDCRHD4, CVDSTRK3, ASTHMA3, ASTHNOW, CHCSCNC1, CHCOCNC1, CHCCOPD3, ADDEPEV3, CHCKDNY2, HAVARTH4, DIABETE4, EDUCA, RENTHOM1, VETERAN3, EMPLOY1, INCOME3, PREGNANT, WEIGHT2, HEIGHT3, CERVSCRN, CRVCLCNC, CRVCLPAP, CRVCLHPV, HADHYST2, SMOKE100, SMOKDAY2, USENOW3, ECIGNOW2, LCSFIRST, LCSLAST, LCSNUMCG, ALCDAY4, AVEDRNK3, DRNK3GE5, MAXDRNKS, PDIABTS1, PREDIAB2, DIABTYPE, HPVADVC4, HPVADSHT, COPDSMOK, CNCRDIFF, CNCRAGE, CNCRTYP2, CSRVINSR, CSRVDEIN, CSRVCLIN, CSRVPAIN, MARIJAN1, MARJSMOK, MARJEAT, MARJVAPE, MARJDAB, MARJOTHR, LASTSMK2, STOPSMK2, MENTCIGS, MENTECIG, BIRTHSEX, SOMALE, SOFEMALE, TRNSGNDR, HADSEX, RRCLASS3, X_METSTAT, X_URBSTAT, MSCODE))
+
+responses_clean_admin <- responses_clean %>%
+  select(c(ID, QSTVER, QSTLANG, X_STSTR, X_RAWRAKE, X_WT2RAKE, X_IMPRACE))
+
+responses_clean_calculated <- responses_clean %>%
+  select(c(ID, X_RFHLTH, X_PHYS14D, X_MENT14D, X_HLTHPLN, X_HCVU652, X_TOTINDA, X_MICHD, X_LTASTH1, X_CASTHM1, X_ASTHMS1, X_PRACE2, X_MRACE2, X_HISPANC, X_RACE1, X_RACEG22, X_RACEGR4, X_SEX, X_AGEG5YR, X_AGE65YR, X_AGE80, X_AGE_G, HTM4, WTKG3, X_BMI5, X_BMI5CAT, X_RFBMI5, X_EDUCAG, X_INCOMG1, X_SMOKER3, X_RFSMOK3, X_CURECI2, X_YRSSMOK, X_PACKDAY, X_PACKYRS, X_YRSQUIT, X_SMOKGRP, DRNKANY6, DROCDY4_, X_RFBING6, X_DRNKWK2, X_RFDRHV8))
+```
+
+## Reading in 2014-2022 Data
+
+[**Steps**]{.underline}
+
+1.  **Load necessary libraries**: Ensures all required packages are available.
+
+2.  **Define variables of interest**: Lists all variables you want to check for presence across years.
+
+3.  **Define read_year_data function**: Reads in data, records the presence of each variable of interest, cleans the data, and adds ID and FYEAR columns.
+
+4.  **Read and combine data for all years**: Uses lapply to apply the function across all specified years and combines the results into a single dataframe.
+
+5.  **Check column presence**: Creates and prints a dataframe showing the presence of each variable for each year.
+
+6.  **Prepare datasets for analysis**: Selects columns for analysis, administrative details, and calculated variables.
+
+```{r}
+
+variables_of_interest <- c("X_STATE", "COLGSEX1", "LANDSEX1", "SEXVAR", "GENHLTH", "PHYSHLTH", 
+                           "MENTHLTH", "POORHLTH", "PRIMINSR", "MEDCOST1", "CHECKUP1", "EXERANY2", 
+                           "SLEPTIM1", "CVDINFR4", "CVDCRHD4", "CVDSTRK3", "ASTHMA3", "ASTHNOW", 
+                           "CHCSCNC1", "CHCOCNC1", "CHCCOPD3", "ADDEPEV3", "CHCKDNY2", "HAVARTH4", 
+                           "DIABETE4", "EDUCA", "RENTHOM1", "VETERAN3", "EMPLOY1", "INCOME3", 
+                           "PREGNANT", "WEIGHT2", "HEIGHT3", "CERVSCRN", "CRVCLCNC", "CRVCLPAP", 
+                           "CRVCLHPV", "HADHYST2", "SMOKE100", "SMOKDAY2", "USENOW3", "ECIGNOW2", 
+                           "LCSFIRST", "LCSLAST", "LCSNUMCG", "ALCDAY4", "AVEDRNK3", "DRNK3GE5", 
+                           "MAXDRNKS", "PDIABTS1", "PREDIAB2", "DIABTYPE", "HPVADVC4", "HPVADSHT", 
+                           "COPDSMOK", "CNCRDIFF", "CNCRAGE", "CNCRTYP2", "CSRVINSR", "CSRVDEIN", 
+                           "CSRVCLIN", "CSRVPAIN", "MARIJAN1", "MARJSMOK", "MARJEAT", "MARJVAPE", 
+                           "MARJDAB", "MARJOTHR", "LASTSMK2", "STOPSMK2", "MENTCIGS", "MENTECIG", 
+                           "BIRTHSEX", "SOMALE", "SOFEMALE", "TRNSGNDR", "HADSEX", "RRCLASS3", 
+                           "X_METSTAT", "X_URBSTAT", "MSCODE", "QSTVER", "QSTLANG", "X_STSTR", 
+                           "X_RAWRAKE", "X_WT2RAKE", "X_IMPRACE", "X_RFHLTH", "X_PHYS14D", 
+                           "X_MENT14D", "X_HLTHPLN", "X_HCVU652", "X_TOTINDA", "X_MICHD", "X_LTASTH1", 
+                           "X_CASTHM1", "X_ASTHMS1", "X_PRACE2", "X_MRACE2", "X_HISPANC", "X_RACE1", 
+                           "X_RACEG22", "X_RACEGR4", "X_SEX", "X_AGEG5YR", "X_AGE65YR", "X_AGE80", 
+                           "X_AGE_G", "HTM4", "WTKG3", "X_BMI5", "X_BMI5CAT", "X_RFBMI5", "X_EDUCAG", 
+                           "X_INCOMG1", "X_SMOKER3", "X_RFSMOK3", "X_CURECI2", "X_YRSSMOK", "X_PACKDAY", 
+                           "X_PACKYRS", "X_YRSQUIT", "X_SMOKGRP", "DRNKANY6", "DROCDY4_", "X_RFBING6", 
+                           "X_DRNKWK2", "X_RFDRHV8")
+
+## Function to Read Data for a Given Year and Record Column Presence
+read_year_data <- function(year) {
+  # Read the column specifications
+  columns <- read_excel(here("Data", "0_annual_lengths.xlsx"), sheet=as.character(year))
+  
+  # Calculate column widths
+  columns$File_Width <- sapply(1:nrow(columns), function(y) ifelse(y < nrow(columns), 
+    columns$starting_column[y + 1] - columns$starting_column[y], 1))
+  
+  columns <- columns[columns$File_Width > 0,]
+  
+  # Read the data
+  responses <- tryCatch({
+    read.fwf(here("data", paste0(year, "_data.ASC")), widths = columns$File_Width, col.names = columns$variable_name, fileEncoding = "UTF-8")
+  }, error = function(e) {
+    read.fwf(here("data", paste0(year, "_data.ASC")), widths = columns$File_Width, col.names = columns$variable_name, fileEncoding = "ISO-8859-1")
+  })
+  
+  # Record column presence for variables of interest
+  column_presence <- data.frame(year = year)
+  for (col in variables_of_interest) {
+    column_presence[[col]] <- col %in% colnames(responses)
+  }
+  
+  # Clean the data
+  responses_clean <- responses %>%
+    select(where(~ !all(is.na(.)))) %>%
+    mutate(ID = row_number(), FYEAR = year)
+  
+  return(list(data = responses_clean, presence = column_presence))
+}
+```
+
+## Amalgamation
+
+\*Switched to SAS Transport Files for Faster / More Efficient Reading.
+
+```{r}
+
+# Define a function to read, process, and save each file individually
+process_and_save_xpt_files <- function(start_year, end_year, subdirectory, file_extension, temp_directory) {
+  for (year in start_year:end_year) {
+    # Construct the file path
+    file_path <- here(subdirectory, paste0(year, "_data", file_extension))
+    
+    # Read the XPT file
+    data <- read_xpt(file_path)
+    
+    # Ensure consistent data types
+    data <- mutate(data, SEQNO = as.character(SEQNO))
+    
+    # Save the processed data to a temporary file
+    saveRDS(data, file = here(temp_directory, paste0(year, "_data.rds")))
+  }
+}
+
+# Create a temporary directory to save intermediate files
+temp_directory <- "temp_data"
+dir.create(temp_directory, showWarnings = FALSE)
+
+# Process and save each XPT file individually
+process_and_save_xpt_files(
+  start_year = 2014,
+  end_year = 2022,
+  subdirectory = "Data",
+  file_extension = ".XPT",
+  temp_directory = temp_directory
+)
+
+# Define a function to read, subset, and combine the data
+subset_and_combine_data <- function(start_year, end_year, temp_directory, variables_of_interest) {
+  combined_data <- data.frame()  # Initialize an empty data frame
+  
+  for (year in start_year:end_year) {
+    # Construct the file path for the RDS file
+    file_path <- here(temp_directory, paste0(year, "_data.rds"))
+    
+    # Read the RDS file
+    data <- readRDS(file_path)
+    
+    # Subset the data to only include the variables of interest
+    subset_data <- data %>% select(any_of(variables_of_interest3))
+    
+    # Combine the subset data into the combined data frame
+    combined_data <- bind_rows(combined_data, subset_data)
+    
+    # Remove the original data to free up memory
+    rm(data)
+    gc()  # Call garbage collection to free up memory
+  }
+  
+  return(combined_data)
+}
+
+# Define a function to check the presence of variables and combine the results
+check_and_combine_variable_presence <- function(start_year, end_year, temp_directory, variables_of_interest) {
+  # Initialize an empty list to store results
+  presence_list <- list()
+  
+  for (year in start_year:end_year) {
+    # Construct the file path for the RDS file
+    file_path <- here(temp_directory, paste0(year, "_data.rds"))
+    
+    # Read the RDS file
+    data <- readRDS(file_path)
+    
+    # Check for the presence of each variable of interest
+    presence <- sapply(variables_of_interest, function(var) var %in% names(data))
+    
+    # Create a data frame with the results for the current year
+    presence_df <- data.frame(Year = year, t(presence))
+    
+    # Add the data frame to the list
+    presence_list[[length(presence_list) + 1]] <- presence_df
+    
+    # Remove the original data to free up memory
+    rm(data)
+    gc()  # Call garbage collection to free up memory
+  }
+  
+  # Combine the list of data frames into a single data frame
+  combined_presence <- bind_rows(presence_list)
+  
+  return(combined_presence)
+}
+
+# Inspect the combined data
+head(combined_presence)
+summary(combined_presence)
+
+# Variables of interest
+variables_of_interest1 <- c(
+  "_STATE",
+  "IYEAR",
+  "QSTVER",
+  "QSTLANG",
+  "_STSTR",
+  "_STRWT",
+  "_RAWRAKE",
+  "_WT2RAKE",
+  "SOMALE", 
+  "SOFEMALE", 
+  "TRNSGNDR",
+  "_METSTAT",
+  "_URBSTAT",
+  "_IMPRACE",
+  "HPVADVC4",
+  "HPVADSHT",
+  "CRVCLHPV",
+  "CERVSCRN",
+  "CRVCLCNC",
+  "CRVCLPAP"
+)
+
+variables_of_interest2 <- c(
+  "_STATE",
+  "IYEAR",
+  "QSTVER",
+  "QSTLANG",
+  "_STSTR",
+  "_STRWT",
+  "_RAWRAKE",
+  "_WT2RAKE",
+  "SOMALE", 
+  "SOFEMALE", 
+  "TRNSGNDR",
+  "_METSTAT",
+  "_URBSTAT",
+  "_IMPRACE",
+  "HPVADVC4",
+  "HPVADSHT",
+  "CRVCLHPV",
+  "CERVSCRN",
+  "CRVCLCNC",
+  "CRVCLPAP",
+  "HADPAP2",
+  "LASTPAP2",
+  "HPVTEST",
+  "HPLSTTST"
+)
+
+variables_of_interest3 <- c(
+  "_STATE",
+  "IYEAR",
+  "QSTVER",
+  "QSTLANG",
+  "_STSTR",
+  "_STRWT",
+  "_RAWRAKE",
+  "_WT2RAKE",
+  "SOMALE", 
+  "SOFEMALE", 
+  "TRNSGNDR",
+  "_METSTAT",
+  "_URBSTAT",
+  "_IMPRACE",
+  "HPVADVC4",
+  "HPVADSHT",
+  "CRVCLHPV",
+  "CERVSCRN",
+  "CRVCLCNC",
+  "CRVCLPAP",
+  "HADPAP2",
+  "LASTPAP2",
+  "HPVTEST",
+  "HPLSTTST",
+  "HPVADVC2",
+  "HPVADSHT",
+  "SXORIENT",
+  "MSCODE",
+  "_RACE"
+)
+
+# Use the function to check variable presence and combine results from 2014 to 2022
+combined_presence1 <- check_and_combine_variable_presence(
+  start_year = 2014,
+  end_year = 2022,
+  temp_directory = "temp_data",
+  variables_of_interest = variables_of_interest1
+)
+
+# Use the function to check variable presence and combine results from 2014 to 2022
+combined_presence2 <- check_and_combine_variable_presence(
+  start_year = 2014,
+  end_year = 2022,
+  temp_directory = "temp_data",
+  variables_of_interest = variables_of_interest2
+)
+
+# Use the function to check variable presence and combine results from 2014 to 2022
+combined_presence3 <- check_and_combine_variable_presence(
+  start_year = 2014,
+  end_year = 2022,
+  temp_directory = "temp_data",
+  variables_of_interest = variables_of_interest3
+)
+
+
+# Optionally, clean up temporary files
+#unlink(temp_directory, recursive = TRUE)
+
+# Reshape data
+column_presence_df_long1 <- melt(combined_presence1, id.vars = "Year")
+column_presence_df_long2 <- melt(combined_presence2, id.vars = "Year")
+column_presence_df_long3 <- melt(combined_presence3, id.vars = "Year")
+
+# Generate a heatmap
+ggplot(column_presence_df_long1, aes(x = variable, y = factor(Year), fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "red")) +
+  theme_minimal() +
+  labs(title = "Presence of Variables Over Years", x = "Variable", y = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(column_presence_df_long2, aes(x = variable, y = factor(Year), fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "red")) +
+  theme_minimal() +
+  labs(title = "Presence of Variables Over Years", x = "Variable", y = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(column_presence_df_long3, aes(x = variable, y = factor(Year), fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "red")) +
+  theme_minimal() +
+  labs(title = "Presence of Variables Over Years", x = "Variable", y = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Variable Selection
+
+```{r}
+#| eval: false
+
+responses_clean_analysis <- all_data %>%
+  select(c(ID, FYEAR, X_STATE, COLGSEX1, LANDSEX1, SEXVAR, GENHLTH, PHYSHLTH, MENTHLTH, POORHLTH, PRIMINSR, MEDCOST1, CHECKUP1, EXERANY2, SLEPTIM1, CVDINFR4, CVDCRHD4, CVDSTRK3, ASTHMA3, ASTHNOW, CHCSCNC1, CHCOCNC1, CHCCOPD3, ADDEPEV3, CHCKDNY2, HAVARTH4, DIABETE4, EDUCA, RENTHOM1, VETERAN3, EMPLOY1, INCOME3, PREGNANT, WEIGHT2, HEIGHT3, CERVSCRN, CRVCLCNC, CRVCLPAP, CRVCLHPV, HADHYST2, SMOKE100, SMOKDAY2, USENOW3, ECIGNOW2, LCSFIRST, LCSLAST, LCSNUMCG, ALCDAY4, AVEDRNK3, DRNK3GE5, MAXDRNKS, PDIABTS1, PREDIAB2, DIABTYPE, HPVADVC4, HPVADSHT, COPDSMOK, CNCRDIFF, CNCRAGE, CNCRTYP2, CSRVINSR, CSRVDEIN, CSRVCLIN, CSRVPAIN, MARIJAN1, MARJSMOK, MARJEAT, MARJVAPE, MARJDAB, MARJOTHR, LASTSMK2, STOPSMK2, MENTCIGS, MENTECIG, BIRTHSEX, SOMALE, SOFEMALE, TRNSGNDR, HADSEX, RRCLASS3, X_METSTAT, X_URBSTAT, MSCODE))
+
+responses_clean_admin <- all_data %>%
+  select(c(ID, FYEAR, QSTVER, QSTLANG, X_STSTR, X_RAWRAKE, X_WT2RAKE, X_IMPRACE))
+
+# These are for Core; optional modules have a separate weight / structure 
+# Mutate variable for either core or optional 
+
+responses_clean_calculated <- all_data %>%
+  select(c(ID, FYEAR, X_RFHLTH, X_PHYS14D, X_MENT14D, X_HLTHPLN, X_HCVU652, X_TOTINDA, X_MICHD, X_LTASTH1, X_CASTHM1, X_ASTHMS1, X_PRACE2, X_MRACE2, X_HISPANC, X_RACE1, X_RACEG22, X_RACEGR4, X_SEX, X_AGEG5YR, X_AGE65YR, X_AGE80, X_AGE_G, HTM4, WTKG3, X_BMI5, X_BMI5CAT, X_RFBMI5, X_EDUCAG, X_INCOMG1, X_SMOKER3, X_RFSMOK3, X_CURECI2, X_YRSSMOK, X_PACKDAY, X_PACKYRS, X_YRSQUIT, X_SMOKGRP, DRNKANY6, DROCDY4_, X_RFBING6, X_DRNKWK2, X_RFDRHV8))
+```

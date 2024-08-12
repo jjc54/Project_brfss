@@ -1,0 +1,171 @@
+---
+title: |
+  ![](Images/logo.jpg){fig-align="left" width="500"}  \  
+    \  
+    Project BRFSS Weekly Update
+author: "Joshua J. Cook, M.S. DS, M.S. CRM, \ ACRP-PM, CCRC, Swann A. Adams Ph.D., M.S., FACE"
+date: today
+format:
+  html:
+    html-table-processing: none
+embed-resources: true
+toc: true
+---
+
+## Purpose
+
+Temporal analysis (at least 10 years) of HPV screening/vaccination and cervical cancer diagnosis by [sexual orientation and gender identity (SOGI).]{.underline}
+
+-   2014-2023 (2023 not yet available as of 20JUL2024)
+
+-   Straight v. non-straight
+
+    -   urban v. rural
+
+    -   racial/ethnic
+
+-   Cis v. trans
+
+    -   urban v. rural
+
+    -   racial/ethnic
+
+## Temporal Amalgamation
+
+::: callout-warning
+*\*Switched to SAS Transport Files for Faster / More Efficient Reading.*
+:::
+
+{{< include /Analysis/data_processing.qmd >}}
+
+## What's Missing?
+
+{{< embed Analysis/data_missing.qmd#fig-missing-1 >}}
+
+{{< embed Analysis/data_missing.qmd#fig-missing-2 >}}
+
+{{< embed Analysis/data_missing.qmd#fig-missing-3 >}}
+
+## Codebook / Data Dictionary
+
+```{r}
+#| warning: false
+#| echo: true
+
+library(readxl) # Importing Excel files
+library(here) # Managing nested directories 
+library(tidyverse) # Data wrangling, viz
+library(gt) # For table generation
+
+# Construct the path to the codebook using here
+codebook_path <- here("Data", "codebook.xlsx")
+
+# Read the Excel file
+codes <- read_xlsx(codebook_path, sheet = "Current_Codebook")
+```
+
+```{r}
+
+codes %>%
+  gt() %>%
+  opt_interactive(
+    use_search=TRUE,
+    use_filters=TRUE
+  )
+```
+
+## Variable Breakdown for Potential Harmonizing
+
+::: callout-warning
+*\*Need 2023 data release to have 10 years for temporal paper.*
+:::
+
+### Survey Design, Survey Stratification, Survey Weighting - GOT IT
+
+### Sex - GOT IT (see notes)
+
+-   2022-2019 = X_SEX
+
+-   2018 = SEX_1
+
+-   2017-2014 = SEX
+
+### Sexual Orientation - GOT IT (see notes)
+
+-   2022-2018 = SOMALE (for sex=male), SOFEMALE (for sex=female)
+
+-   2017-2014 = SXORIENT (need to subset by Sex to match SOMALE and SOFEMALE)
+
+### Gender Identity - GOT IT
+
+### Urban v. Rural - GOT IT (see notes)
+
+-   Use MSCODE for all years
+
+-   More specifics available for 2022-2018 via X_URBSTAT and X_METSTAT (don't use?)
+
+### HPV Vaccination - GOT IT (see notes)
+
+-   2022-2020 = HPVADVC4, HPVADSHT
+
+-   2019 = HPVADVC3, HPVADSHT
+
+-   2018-2014 = HPVADVC2, HPVADSHT
+
+### HPV Testing (MAY BE A PART OF PAP TEST) - MISSING 1 YEAR (see notes)
+
+-   2022-2021 = CRVCLHPV
+
+-   2020-2018, 2016-2014 = HPVTEST, HPLSTTST
+
+-   2017 = [MISSING]{.underline}
+
+### Cervical Cancer Screening (AKA PAP TEST) - MISSING 1 YEAR (see notes)
+
+-   2022-2021 = CERVSCRN, CRVCLCNC, CRVCLPAP
+
+-   2020-2018, 2016-2014 = HADPAP2, LASTPAP2
+
+-   2017 = [MISSING]{.underline}
+
+### Cervical Cancer Diagnosis - MISSING 1 YEAR (see notes)
+
+-   2022 = CNCRDIFF, CNCRAGE, CNCRTYP2
+
+-   2021-2016, 2014 = CNCRDIFF, CNCRAGE, CNCRTYP1
+
+-   2015 = [MISSING]{.underline}
+
+## Summary
+
+To complete a temporal analysis as planned, we need to wait for 2023 data. In the meantime, we can begin **cleaning and analyzing 2022-2014 data as noted above.**
+
+We have [complete and clean data]{.underline} for the following:
+
+-   survey design,
+
+-   survey stratification,
+
+-   survey weighting,
+
+-   gender identity.
+
+We [can engineer complete and clean data]{.underline} for:
+
+-   sex,
+
+-   sexual orientation,
+
+-   urban v. rural status,
+
+-   HPV vaccination.
+
+We will have [incomplete but clean data (missing 1 year each)]{.underline} for:
+
+-   HPV testing,
+
+-   cervical cancer screening,
+
+-   cervical cancer diagnoses.
+
+These findings impact our timelines for the abstract and manuscript submissions, but do not impact our technical papers (which are due in the coming weeks).
